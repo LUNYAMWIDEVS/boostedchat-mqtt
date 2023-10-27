@@ -139,28 +139,31 @@ class MQTTServer {
   private async sendNewMessage(threadId?: string, text?: string) {
     if (threadId == null || text == null) return;
     const response = await fetch(
-      `${Bun.env.API_BASE_URL}/api/v1/instagram/dm/${threadId}/generate-response/`,
+      `${Bun.env.API_BASE_URL}/instagram/dflow/${threadId}/generate-response/`,
       {
         method: "POST",
         body: JSON.stringify({ message: text }),
         headers: { "Content-Type": "application/json" },
       }
     );
+    if (response.status === 200) {
+      const body = (await response.json()) as {
+        status: number;
+        generated_comment: string;
+        text: string;
+        success: boolean;
+        username: string;
+      };
 
-    const body = (await response.json()) as {
-      status: number;
-      generated_comment: string;
-      text: string;
-      success: boolean;
-      username: string;
-    };
-
-    if (body.status === 200) {
-      const userId = await this.ig.user.getIdByUsername(body.username);
-      const thread = this.ig.entity.directThread([userId.toString()]);
-      await thread.broadcastText(body.generated_comment);
+      if (body.status === 200) {
+        const userId = await this.ig.user.getIdByUsername(body.username);
+        const thread = this.ig.entity.directThread([userId.toString()]);
+        await thread.broadcastText(body.generated_comment);
+      }
+      console.log(body);
+    } else {
+      console.log(response.status, response.text);
     }
-    console.log(body);
   }
 
   public async initHttpServer() {
@@ -173,22 +176,28 @@ class MQTTServer {
   private async bunFetch(request: Request) {
     const url = new URL(request.url);
     if (request.method === "POST" && url.pathname === "/send-message") {
-      const data = (await request.json()) as {
-        message: string;
-        username: string;
-      };
-      const userId = await this.ig.user.getIdByUsername(data.username);
-      const thread = this.ig.entity.directThread([userId.toString()]);
-      const sent_message = (await thread.broadcastText(
-        data.message
-      )) as DirectThreadRepositoryBroadcastResponsePayload;
-      console.log(sent_message);
-      return new Response(
-        JSON.stringify({
-          thread_id: sent_message.thread_id,
-          timestamp: sent_message.timestamp,
-        })
-      );
+      try {
+        const data = (await request.json()) as {
+          message: string;
+          username: string;
+        };
+        const userId = await this.ig.user.getIdByUsername(data.username);
+        const thread = this.ig.entity.directThread([userId.toString()]);
+
+        const sent_message = (await thread.broadcastText(
+          data.message
+        )) as DirectThreadRepositoryBroadcastResponsePayload;
+
+        return new Response(
+          JSON.stringify({
+            thread_id: sent_message.thread_id,
+            timestamp: sent_message.timestamp,
+          })
+        );
+      } catch (err) {
+        console.log(err);
+        return new Response("There was an error", { status: 400 });
+      }
     }
     return new Response("Hello from Bun!");
   }
