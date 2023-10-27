@@ -12,7 +12,11 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@types/inquirer": "^9.0.6",
+    "bluebird": "^3.7.2",
+    "inquirer": "^9.2.11",
     "instagram-private-api": "^1.45.3",
-    "instagram_mqtt": "^1.2.2"
+    "instagram_mqtt": "^1.2.2",
+    "requirer": "^0.0.4"
   }
 }
