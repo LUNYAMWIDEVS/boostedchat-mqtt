@@ -126,10 +126,12 @@ class MQTTServer {
       if (name === "messageWrapper" && userId) {
         (async () => {
           if (data?.message?.user_id === userId || !data?.message?.text) return;
-          await this.sendNewMessage(
-            data?.message?.thread_id,
-            data?.message?.text
-          );
+          setTimeout(async () => {
+            await this.sendNewMessage(
+              data?.message?.thread_id,
+              data?.message?.text
+            );
+          }, 20000);
         })();
       }
       console.log(name, data);
@@ -156,11 +158,31 @@ class MQTTServer {
       };
 
       if (body.status === 200) {
-        const userId = await this.ig.user.getIdByUsername(body.username);
-        const thread = this.ig.entity.directThread([userId.toString()]);
-        await thread.broadcastText(body.generated_comment);
+        if (body.generated_comment === "Come again") {
+          //send email
+          const humanTakeover = await fetch(
+            `${Bun.env.API_BASE_URL}/instagram/fallback/${threadId}/assign-operator/`,
+            {
+              method: "POST",
+              body: JSON.stringify({ message: text }),
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+          if (humanTakeover.status === 200) {
+            const humanTakeoverBody = (await response.json()) as {
+              status: number;
+              assign_operator: boolean;
+            };
+            console.log(humanTakeoverBody);
+          }
+        } else {
+          setTimeout(async () => {
+            const userId = await this.ig.user.getIdByUsername(body.username);
+            const thread = this.ig.entity.directThread([userId.toString()]);
+            await thread.broadcastText(body.generated_comment);
+          }, 30000);
+        }
       }
-      console.log(body);
     } else {
       console.log(response.status, response.text);
     }
