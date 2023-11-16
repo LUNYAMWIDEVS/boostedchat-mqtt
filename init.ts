@@ -40,6 +40,9 @@ export interface Message {
 
 class MQTTServer {
   private ig: IgApiClientRealtime;
+  private messageHolder: {
+    [key: string]: { messages: string[]; timeoutId: Timer };
+  };
 
   constructor() {
     this.ig = withRealtime(
@@ -47,7 +50,11 @@ class MQTTServer {
       /* you may pass mixins in here */
     );
     this.ig.state.generateDevice(Bun.env.IG_USERNAME);
-    this.ig.state.proxyUrl = Bun.env.IG_PROXY;
+
+    if (Bun.env.IG_PROXY) {
+      this.ig.state.proxyUrl = Bun.env.IG_PROXY;
+    }
+    this.messageHolder = {};
   }
 
   public async initializeRealtimeEvents() {
@@ -126,25 +133,58 @@ class MQTTServer {
       if (name === "messageWrapper" && userId) {
         (async () => {
           if (data?.message?.user_id === userId || !data?.message?.text) return;
-          setTimeout(async () => {
-            await this.sendNewMessage(
-              data?.message?.thread_id,
-              data?.message?.text
-            );
-          }, 20000);
+          if (data?.message?.thread_id == null || data?.message?.text == null) {
+            return;
+          }
+          this.messageQueue(data?.message?.thread_id, data?.message?.text);
         })();
       }
       console.log(name, data);
     };
   }
 
-  private async sendNewMessage(threadId?: string, text?: string) {
-    if (threadId == null || text == null) return;
+  private async messageQueue(thread_id: string, message: string) {
+    if (this.messageHolder[thread_id]) {
+      if (this.messageHolder[thread_id].messages.length === 0) {
+        this.messageHolder[thread_id].messages = [message];
+      } else {
+        this.messageHolder[thread_id].messages = [
+          ...this.messageHolder[thread_id].messages,
+          message,
+        ];
+      }
+
+      const timeoutId = this.messageHolder[thread_id].timeoutId;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      const newTimeoutId = setTimeout(async () => {
+        await this.sendNewMessage(
+          thread_id,
+          this.messageHolder[thread_id].messages
+        );
+      }, 60000);
+      this.messageHolder[thread_id].timeoutId = newTimeoutId;
+    } else {
+      const newTimeoutId = setTimeout(async () => {
+        await this.sendNewMessage(
+          thread_id,
+          this.messageHolder[thread_id].messages
+        );
+      }, 60000);
+      this.messageHolder[thread_id] = {
+        messages: [message],
+        timeoutId: newTimeoutId,
+      };
+    }
+  }
+
+  private async sendNewMessage(threadId: string, messages: string[]) {
     const response = await fetch(
       `${Bun.env.API_BASE_URL}/instagram/dflow/${threadId}/generate-response/`,
       {
         method: "POST",
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: messages.join("#*eb4*#") }),
         headers: { "Content-Type": "application/json" },
       }
     );
@@ -158,18 +198,19 @@ class MQTTServer {
       };
 
       if (body.status === 200) {
+        delete this.messageHolder[threadId];
         if (body.generated_comment === "Come again") {
           //send email
           const humanTakeover = await fetch(
             `${Bun.env.API_BASE_URL}/instagram/fallback/${threadId}/assign-operator/`,
             {
               method: "POST",
-              body: JSON.stringify({ message: text }),
+              body: JSON.stringify({ assigned_to: "Human" }),
               headers: { "Content-Type": "application/json" },
             }
           );
           if (humanTakeover.status === 200) {
-            const humanTakeoverBody = (await response.json()) as {
+            const humanTakeoverBody = (await humanTakeover.json()) as {
               status: number;
               assign_operator: boolean;
             };
