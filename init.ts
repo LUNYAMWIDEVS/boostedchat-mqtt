@@ -262,6 +262,48 @@ class MQTTServer {
         return new Response("There was an error", { status: 400 });
       }
     }
+    if (request.method === "POST" && url.pathname === "/send-link") {
+      try {
+        const data = (await request.json()) as {
+          message: string;
+          username: string;
+          links: string;
+          mediaId: string;
+        };
+        const userId = await this.ig.user.getIdByUsername(data.username);
+        const thread = this.ig.entity.directThread([userId.toString()]);
+
+        await thread.broadcastPost(data.mediaId);
+        await thread.broadcastText(data.message);
+
+        return new Response(JSON.stringify("OK"));
+      } catch (err) {
+        console.log(err);
+        return new Response("There was an error", { status: 400 });
+      }
+    }
+    if (request.method === "POST" && url.pathname === "/post-media") {
+      try {
+        const data = (await request.json()) as {
+          imageURL: string;
+          caption: string;
+        };
+        const imageResp = await fetch(data.imageURL, {
+          method: "GET",
+        });
+        const imageBuffer = await imageResp.blob();
+
+        this.ig.publish.photo({
+          file: Buffer.from(await imageBuffer.arrayBuffer()),
+          caption: data.caption,
+        });
+
+        return new Response(JSON.stringify("OK"));
+      } catch (err) {
+        console.log(err);
+        return new Response("There was an error", { status: 400 });
+      }
+    }
     return new Response("Hello from Bun!");
   }
 }
