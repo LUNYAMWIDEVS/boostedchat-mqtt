@@ -4,4 +4,5 @@ import { MQTTServer } from "./init";
   const server = new MQTTServer();
   await server.initializeRealtimeEvents();
   await server.initHttpServer();
+  server.initializeSentry();
 })();

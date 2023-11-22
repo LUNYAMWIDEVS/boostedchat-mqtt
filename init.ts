@@ -6,6 +6,7 @@ import {
   IgApiClient,
 } from "instagram-private-api";
 import { SkywalkerSubscriptions } from "instagram_mqtt";
+import * as Sentry from "@sentry/bun";
 
 export interface Message {
   event: "patch";
@@ -81,9 +82,24 @@ class MQTTServer {
 
     this.ig.realtime.on("realtimeSub", this.logEvent("realtimeSub"));
 
-    this.ig.realtime.on("error", console.error);
+    this.ig.realtime.on("error", (err) => {
+      Sentry.captureException(err);
+      console.log("err");
+    });
 
-    this.ig.realtime.on("close", () => console.error("RealtimeClient closed"));
+    this.ig.realtime.on("disconnect", () => {
+      Sentry.captureMessage(
+        `${Bun.env.CLIENT_ORG} mqtt client got disconnected`
+      );
+      console.log("Disconnected");
+    });
+
+    this.ig.realtime.on("close", () => {
+      console.log("Closed");
+      Sentry.captureMessage(
+        `${Bun.env.CLIENT_ORG} mqtt realtime client closed`
+      );
+    });
 
     await this.ig.realtime.connect({
       graphQlSubs: [
@@ -258,7 +274,7 @@ class MQTTServer {
           })
         );
       } catch (err) {
-        console.log(err);
+        // Sentry.captureException(err);
         return new Response("There was an error", { status: 400 });
       }
     }
@@ -278,7 +294,7 @@ class MQTTServer {
 
         return new Response(JSON.stringify("OK"));
       } catch (err) {
-        console.log(err);
+        // Sentry.captureException(err);
         return new Response("There was an error", { status: 400 });
       }
     }
@@ -300,11 +316,20 @@ class MQTTServer {
 
         return new Response(JSON.stringify("OK"));
       } catch (err) {
+        // Sentry.captureException(err);
         console.log(err);
         return new Response("There was an error", { status: 400 });
       }
     }
     return new Response("Hello from Bun!");
+  }
+
+  public initializeSentry() {
+    Sentry.init({
+      dsn: Bun.env.SENTRY_DSN,
+      // Performance Monitoring
+      tracesSampleRate: 1.0, // Capture 100% of the transactions
+    });
   }
 }
 

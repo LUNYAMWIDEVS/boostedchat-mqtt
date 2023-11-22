@@ -12,6 +12,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@sentry/bun": "^7.81.1",
     "@types/inquirer": "^9.0.6",
     "bluebird": "^3.7.2",
     "inquirer": "^9.2.11",
