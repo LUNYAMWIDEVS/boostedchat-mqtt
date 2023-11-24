@@ -6,7 +6,8 @@ import {
   IgApiClient,
 } from "instagram-private-api";
 import { SkywalkerSubscriptions } from "instagram_mqtt";
-import * as Sentry from "@sentry/bun";
+import { eventLogger, httpLogger, libLogger } from "./config/logger";
+import { Mailer } from "./services/mailer/mailer";
 
 export interface Message {
   event: "patch";
@@ -44,6 +45,7 @@ class MQTTServer {
   private messageHolder: {
     [key: string]: { messages: string[]; timeoutId: Timer };
   };
+  private mailer = new Mailer();
 
   constructor() {
     this.ig = withRealtime(
@@ -64,9 +66,13 @@ class MQTTServer {
       Bun.env.IG_PASSWORD
     );
 
-    this.ig.realtime.on("receive", (topic, messages) =>
-      console.log("receive", topic, messages)
-    );
+    this.ig.realtime.on("receive", (topic, messages) => {
+      eventLogger.log({
+        level: "info",
+        label: "receive",
+        message: JSON.stringify(topic) + "" + JSON.stringify(messages),
+      });
+    });
 
     this.ig.realtime.on(
       "message",
@@ -83,22 +89,36 @@ class MQTTServer {
     this.ig.realtime.on("realtimeSub", this.logEvent("realtimeSub"));
 
     this.ig.realtime.on("error", (err) => {
-      Sentry.captureException(err);
-      console.log("err");
+      libLogger.log({
+        level: "error",
+        label: "MQTT error",
+        message: JSON.stringify(err),
+      });
     });
 
     this.ig.realtime.on("disconnect", () => {
-      Sentry.captureMessage(
-        `${Bun.env.CLIENT_ORG} mqtt client got disconnected`
-      );
-      console.log("Disconnected");
+      this.mailer.send({
+        subject: "MQTT client disconnected",
+        text: "Hi team, The MQTT Client got disconnected. Please check on this.",
+      });
+
+      libLogger.log({
+        level: "error",
+        label: "MQTT Disconnect",
+        message: "Client got disconnected",
+      });
     });
 
     this.ig.realtime.on("close", () => {
-      console.log("Closed");
-      Sentry.captureMessage(
-        `${Bun.env.CLIENT_ORG} mqtt realtime client closed`
-      );
+      this.mailer.send({
+        subject: "Realtime client closed",
+        text: "Hi team, The Realtime client closed. Please check on this.",
+      });
+      libLogger.log({
+        level: "error",
+        label: "MQTT Closed",
+        message: "Realtime client closed",
+      });
     });
 
     await this.ig.realtime.connect({
@@ -125,7 +145,7 @@ class MQTTServer {
 
     // simulate turning the device off after 2s and turning it back on after another 2s
     setTimeout(() => {
-      console.log("Device off");
+      eventLogger.info("Device off");
       // from now on, you won't receive any realtime-data as you "aren't in the app"
       // the keepAliveTimeout is somehow a 'constant' by instagram
       this.ig.realtime.direct.sendForegroundState({
@@ -135,7 +155,8 @@ class MQTTServer {
       });
     }, 2000);
     setTimeout(() => {
-      console.log("In App");
+      eventLogger.info("In App");
+      console.log("Logged in");
       this.ig.realtime.direct.sendForegroundState({
         inForegroundApp: true,
         inForegroundDevice: true,
@@ -155,7 +176,11 @@ class MQTTServer {
           this.messageQueue(data?.message?.thread_id, data?.message?.text);
         })();
       }
-      console.log(name, data);
+      eventLogger.log({
+        level: "info",
+        label: name,
+        message: JSON.stringify(data),
+      });
     };
   }
 
@@ -230,7 +255,11 @@ class MQTTServer {
               status: number;
               assign_operator: boolean;
             };
-            console.log(humanTakeoverBody);
+            httpLogger.log({
+              level: "info",
+              label: "Human Takeover Body",
+              message: JSON.stringify(humanTakeoverBody),
+            });
           }
         } else {
           setTimeout(async () => {
@@ -241,7 +270,18 @@ class MQTTServer {
         }
       }
     } else {
-      console.log(response.status, response.text);
+      this.mailer.send({
+        subject: "Generating response failed",
+        text: `Hi team, There was an error generating a response for thread ${threadId}. Please check on this.`,
+      });
+      httpLogger.log({
+        level: "error",
+        label: "Generate response error",
+        message: JSON.stringify({
+          status: response.status,
+          text: response.text,
+        }),
+      });
     }
   }
 
@@ -274,7 +314,15 @@ class MQTTServer {
           })
         );
       } catch (err) {
-        // Sentry.captureException(err);
+        httpLogger.error(err);
+        this.mailer.send({
+          subject: "Send message error",
+          text: `Hi team, There was an error sending a message to a lead.\nThe error message is \n${
+            (err as Error).message
+          }\nand the stack trace is as follows:\n${
+            (err as Error).stack
+          }\nPlease check on this.`,
+        });
         return new Response("There was an error", { status: 400 });
       }
     }
@@ -294,7 +342,19 @@ class MQTTServer {
 
         return new Response(JSON.stringify("OK"));
       } catch (err) {
-        // Sentry.captureException(err);
+        console.log("send link error", err);
+        httpLogger.error({
+          level: "error",
+          label: "Sending link error",
+          message: (err as Error).message,
+          stack: (err as Error).stack,
+        });
+        this.mailer.send({
+          subject: "Send message error",
+          text: `Hi team, There was an error sending a link to a lead.\n The error message is ${
+            (err as Error).message
+          }.\n Please check on this.`,
+        });
         return new Response("There was an error", { status: 400 });
       }
     }
@@ -316,20 +376,24 @@ class MQTTServer {
 
         return new Response(JSON.stringify("OK"));
       } catch (err) {
-        // Sentry.captureException(err);
-        console.log(err);
+        console.log("post media error", err);
+        httpLogger.error({
+          level: "error",
+          label: "Sending link error",
+          message: (err as Error).message,
+          stack: (err as Error).stack,
+        });
+        this.mailer.send({
+          subject: "Post media error",
+          text: `Hi team, There was an error sending some media to a lead.\n The error message is ${
+            (err as Error).message
+          }.\n Please check on this.`,
+        });
+
         return new Response("There was an error", { status: 400 });
       }
     }
     return new Response("Hello from Bun!");
-  }
-
-  public initializeSentry() {
-    Sentry.init({
-      dsn: Bun.env.SENTRY_DSN,
-      // Performance Monitoring
-      tracesSampleRate: 1.0, // Capture 100% of the transactions
-    });
   }
 }
 

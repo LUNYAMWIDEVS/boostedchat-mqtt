@@ -12,12 +12,16 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@sentry/bun": "^7.81.1",
     "@types/inquirer": "^9.0.6",
+    "@types/nodemailer": "^6.4.14",
     "bluebird": "^3.7.2",
+    "envalid": "^8.0.0",
     "inquirer": "^9.2.11",
     "instagram-private-api": "^1.45.3",
     "instagram_mqtt": "^1.2.2",
-    "requirer": "^0.0.4"
+    "nodemailer": "^6.9.7",
+    "requirer": "^0.0.4",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^4.7.1"
   }
 }
