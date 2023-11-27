@@ -23,7 +23,7 @@ const prodFormat = () => {
 const transport = (fileName: string) =>
   new transports.DailyRotateFile({
     filename: `${fileName}-%DATE%.log`,
-    datePattern: "YYYY-MM-DD-HH",
+    datePattern: "YYYY-MM-DD",
     dirname: `./logs/${fileName}/`,
     zippedArchive: true,
     maxSize: "20m",
