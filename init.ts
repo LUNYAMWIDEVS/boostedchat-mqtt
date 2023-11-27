@@ -271,8 +271,8 @@ class MQTTServer {
       }
     } else {
       this.mailer.send({
-        subject: "Generating response failed",
-        text: `Hi team, There was an error generating a response for thread ${threadId}. Please check on this.`,
+        subject: `${Bun.env.CLIENT_ORG} Server: Response generation failed`,
+        text: `Hi team, There was an error generating a response for thread${threadId}\nPlease check on this.`,
       });
       httpLogger.log({
         level: "error",
@@ -316,7 +316,7 @@ class MQTTServer {
       } catch (err) {
         httpLogger.error(err);
         this.mailer.send({
-          subject: "Send message error",
+          subject: `${Bun.env.CLIENT_ORG} Server: Sending message error`,
           text: `Hi team, There was an error sending a message to a lead.\nThe error message is \n${
             (err as Error).message
           }\nand the stack trace is as follows:\n${
@@ -350,10 +350,12 @@ class MQTTServer {
           stack: (err as Error).stack,
         });
         this.mailer.send({
-          subject: "Send message error",
-          text: `Hi team, There was an error sending a link to a lead.\n The error message is ${
+          subject: `${Bun.env.CLIENT_ORG} Server: Sending link error`,
+          text: `Hi team, There was an error sending a link to a lead.\nThe error message is \n${
             (err as Error).message
-          }.\n Please check on this.`,
+          }\nand the stack trace is as follows:\n${
+            (err as Error).stack
+          }\nPlease check on this.`,
         });
         return new Response("There was an error", { status: 400 });
       }
@@ -384,10 +386,12 @@ class MQTTServer {
           stack: (err as Error).stack,
         });
         this.mailer.send({
-          subject: "Post media error",
-          text: `Hi team, There was an error sending some media to a lead.\n The error message is ${
+          subject: `${Bun.env.CLIENT_ORG} Server: Posting media error`,
+          text: `Hi team, There was an error sending some media to a lead.\nThe error message is \n${
             (err as Error).message
-          }.\n Please check on this.`,
+          }\nand the stack trace is as follows:\n${
+            (err as Error).stack
+          }\nPlease check on this.`,
         });
 
         return new Response("There was an error", { status: 400 });
