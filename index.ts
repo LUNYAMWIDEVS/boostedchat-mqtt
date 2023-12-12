@@ -9,7 +9,7 @@ import { validateEnv } from "./utils/environment";
   const mqttListener = new MQTTListener(loginObj.igInstance, loginObj.user);
   await mqttListener.initializeRealtimeEvents(
     loginObj.igInstance,
-    loginObj.user
+    loginObj.user,
   );
   const httpServer = new HttpServer(loginObj.igInstance);
   httpServer.initHttpServer();

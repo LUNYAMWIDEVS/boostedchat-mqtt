@@ -23,4 +23,3 @@ COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=prerelease /usr/src/app/ .
 # run the app
 ENTRYPOINT [ "bun", "run", "index.ts" ]
-
