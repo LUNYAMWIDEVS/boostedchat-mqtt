@@ -1,0 +1,27 @@
+version: "3"
+
+services:
+  mqtt:
+    image: mqtt-prod
+    build:
+      context: .
+    ports:
+      - "1883:1883"
+      - "8883:8883"
+      - "3000:3000"
+    volumes:
+      - ../mqtt-logs:/usr/src/app/logs
+    environment:
+      - IG_USERNAME=${IG_USERNAME}
+      - IG_PASSWORD=${IG_PASSWORD}
+      - IG_USERNAMES=${IG_USERNAMES}
+      - IG_PASSWORDS=${IG_PASSWORDS}
+      - API_BASE_URL=${API_BASE_URL}
+      - IG_PROXY=${IG_PROXY}
+      - CLIENT_ORG=${CLIENT_ORG}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - EMAIL_RECIPIENTS=${EMAIL_RECIPIENTS}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
