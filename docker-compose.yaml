@@ -14,6 +14,8 @@ services:
     environment:
       - IG_USERNAME=${IG_USERNAME}
       - IG_PASSWORD=${IG_PASSWORD}
+      - IG_USERNAMES=${IG_USERNAMES}
+      - IG_PASSWORDS=${IG_PASSWORDS}
       - API_BASE_URL=${API_BASE_URL}
       - IG_PROXY=${IG_PROXY}
       - CLIENT_ORG=${CLIENT_ORG}

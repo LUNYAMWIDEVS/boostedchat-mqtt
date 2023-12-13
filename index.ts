@@ -1,9 +1,16 @@
-import { MQTTServer } from "./init";
+import { HttpServer } from "./services/httpServer";
+import { login } from "./services/login";
+import { MQTTListener } from "./services/mqttListener";
 import { validateEnv } from "./utils/environment";
 
 (async () => {
   validateEnv();
-  const server = new MQTTServer();
-  await server.initializeRealtimeEvents();
-  await server.initHttpServer();
+  const loginObj = await login();
+  const mqttListener = new MQTTListener(loginObj.igInstance, loginObj.user);
+  await mqttListener.initializeRealtimeEvents(
+    loginObj.igInstance,
+    loginObj.user,
+  );
+  const httpServer = new HttpServer(loginObj.igInstance);
+  httpServer.initHttpServer();
 })();

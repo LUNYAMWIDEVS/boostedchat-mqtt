@@ -1,26 +1,20 @@
 {
-  "name": "mqtt-bun",
+<<<<<<< HEAD
+  "name": "mqtt-bun-v1",
   "module": "index.ts",
   "type": "module",
-  "scripts": {
-    "start": "bun run index.ts"
-  },
   "devDependencies": {
-    "bun-types": "^1.0.6"
+    "bun-types": "latest"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@types/inquirer": "^9.0.6",
     "@types/nodemailer": "^6.4.14",
-    "bluebird": "^3.7.2",
     "envalid": "^8.0.0",
-    "inquirer": "^9.2.11",
     "instagram-private-api": "^1.45.3",
     "instagram_mqtt": "^1.2.2",
     "nodemailer": "^6.9.7",
-    "requirer": "^0.0.4",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^4.7.1"
   }
