@@ -23,6 +23,8 @@ class Mailer {
   }): Promise<boolean | Error> => {
     try {
       await new Promise((rsv, rjt) => {
+        rsv("Email sent");
+        /*
         mailConfig.sendMail(
           {
             from: Bun.env.EMAIL_USER,
@@ -39,6 +41,7 @@ class Mailer {
             appLogger.info(`Email sent successfully`);
           }
         );
+        */
       });
 
       return true;

@@ -1,4 +1,4 @@
-FROM oven/bun:1 as base
+FROM oven/bun:1.0.16 as base
 WORKDIR /usr/src/app
 
 # Install step

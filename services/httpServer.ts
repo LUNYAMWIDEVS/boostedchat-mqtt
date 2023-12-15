@@ -144,6 +144,43 @@ export class HttpServer {
         return new Response("There was an error", { status: 400 });
       }
     }
+    if (request.method === "POST" && url.pathname === "/trigger-disconnect") {
+      try {
+        await this.igInstance.realtime.disconnect();
+        return new Response(
+          JSON.stringify({
+            status: "OK",
+          })
+        );
+      } catch (err) {
+        console.log("Disconnect error", err);
+        httpLogger.error({
+          level: "error",
+          label: "Sending link error",
+          message: (err as Error).message,
+          stack: (err as Error).stack,
+        });
+        return new Response("There was an error", { status: 400 });
+      }
+    }
+    if (request.method === "POST" && url.pathname === "/trigger-reconnect") {
+      try {
+        return new Response(
+          JSON.stringify({
+            status: "OK",
+          })
+        );
+      } catch (err) {
+        console.log("Disconnect error", err);
+        httpLogger.error({
+          level: "error",
+          label: "Sending link error",
+          message: (err as Error).message,
+          stack: (err as Error).stack,
+        });
+        return new Response("There was an error", { status: 400 });
+      }
+    }
     return new Response("Hello from Bun!");
   }
 }

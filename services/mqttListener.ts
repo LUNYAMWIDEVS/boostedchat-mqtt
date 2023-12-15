@@ -14,6 +14,7 @@ export class MQTTListener {
   private messageHolder: {
     [key: string]: { messages: string[]; timeoutId: Timer };
   };
+  private counter: number;
 
   constructor(
     mAccInstance: IgApiClientRealtime,
@@ -23,6 +24,7 @@ export class MQTTListener {
     this.loggedInUser = mLoggedInUser;
     this.mailer = new Mailer();
     this.messageHolder = {};
+    this.counter = 0;
   }
 
   public async initializeRealtimeEvents(
@@ -55,6 +57,22 @@ export class MQTTListener {
     accountInstance.realtime.on("realtimeSub", this.logEvent("realtimeSub"));
 
     accountInstance.realtime.on("error", async (err) => {
+      console.log(err);
+      if (err.message.toLowerCase().includes("mqttotclient got disconnected")) {
+        console.log("mqttotclient got disconnected in event");
+        if (this.counter < 5) {
+          this.restartMQTTListeners();
+          this.counter += 1;
+        } else {
+          console.log("Attempted 5 times to reconnect ");
+        }
+      }
+      libLogger.log({
+        level: "error",
+        label: "MQTT error",
+        message: JSON.stringify(err),
+      });
+      /*
       await this.mailer.send({
         subject: `${Bun.env.CLIENT_ORG} server: MQTT client error`,
         text: `Hi team, There was an error in mqtt.\nThe error message is \n${
@@ -63,38 +81,32 @@ export class MQTTListener {
           (err as Error).stack
         }\nPlease check on this.`,
       });
-      if (err.message.toLowerCase().includes("mqttotclient got disconnected")) {
-        this.restartMQTTListeners();
-      }
-      libLogger.log({
-        level: "error",
-        label: "MQTT error",
-        message: JSON.stringify(err),
-      });
+      */
     });
 
     accountInstance.realtime.on("disconnect", async () => {
-      await this.mailer.send({
-        subject: "MQTT client disconnected",
-        text: "Hi team, The MQTT Client got disconnected. Please check on this.",
-      });
+      console.log("In disconnect method");
 
       libLogger.log({
         level: "error",
         label: "MQTT Disconnect",
         message: "Client got disconnected",
       });
+      await this.mailer.send({
+        subject: "MQTT client disconnected",
+        text: "Hi team, MQTT was really disconnected got disconnected. Please check on this.",
+      });
     });
 
     accountInstance.realtime.on("close", async () => {
-      await this.mailer.send({
-        subject: "Realtime client closed",
-        text: "Hi team, The Realtime client closed. Please check on this.",
-      });
       libLogger.log({
         level: "error",
         label: "MQTT Closed",
         message: "Realtime client closed",
+      });
+      await this.mailer.send({
+        subject: "Realtime client closed",
+        text: "Hi team, The Realtime client closed. Please check on this.",
       });
     });
 
@@ -133,6 +145,7 @@ export class MQTTListener {
         keepAliveTimeout: 900,
       });
     }, 2000);
+
     setTimeout(() => {
       eventLogger.info("In App");
       console.log("Started listening");
@@ -173,10 +186,30 @@ export class MQTTListener {
   }
 
   private restartMQTTListeners() {
+    this.igInstance.realtime.removeAllListeners();
     setTimeout(async () => {
       try {
         await this.initializeRealtimeEvents(this.igInstance, this.loggedInUser);
+        console.log("Started safely");
+        libLogger.log({
+          level: "info",
+          label: "MQTT restart successful",
+          message: "MQTT Restarted itself successfully",
+        });
+        /*
+        await this.mailer.send({
+          subject: `${Bun.env.CLIENT_ORG} server: MQTT Server restart`,
+          text: `Hi team, The MQTT Server disconnected but it restarted itself`,
+        });
+        */
       } catch (err) {
+        console.log("Error while restarting\n", err);
+        libLogger.log({
+          level: "error",
+          label: "MQTT restart error",
+          message: JSON.stringify(err),
+        });
+        /*
         await this.mailer.send({
           subject: `${Bun.env.CLIENT_ORG} server: Error restarting listeners`,
           text: `Hi team, There was an error in mqtt.\nThe error message is \n${
@@ -185,11 +218,7 @@ export class MQTTListener {
             (err as Error).stack
           }\nPlease check on this.`,
         });
-        libLogger.log({
-          level: "error",
-          label: "MQTT error",
-          message: JSON.stringify(err),
-        });
+        */
       }
     }, 30000);
   }
@@ -205,7 +234,7 @@ export class MQTTListener {
         }
       );
 
-      if (response.status !== 200) {
+      if (response.status !== 201) {
         await this.mailer.send({
           subject: `${Bun.env.CLIENT_ORG} Server: Sending sales rep message to API server failed`,
           text: `Hi team, There was an error sending a sales rep message to the api server: ${message} belonging to thread ${threadId}\n. Please check on this.`,
@@ -276,7 +305,12 @@ export class MQTTListener {
         text: string;
         success: boolean;
         username: string;
+        assigned_to: "Robot" | "Human";
       };
+
+      if (body.assigned_to === "Human") {
+        return;
+      }
 
       if (body.status === 200) {
         delete this.messageHolder[threadId];
