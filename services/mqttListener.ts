@@ -27,11 +27,8 @@ export class MQTTListener {
     this.counter = 0;
   }
 
-  public async initializeRealtimeEvents(
-    accountInstance: IgApiClientRealtime,
-    mLoggedInUser: AccountRepositoryLoginResponseLogged_in_user
-  ) {
-    accountInstance.realtime.on("receive", (topic, messages) => {
+  public registerRealtimeListeners() {
+    this.igInstance.realtime.on("receive", (topic, messages) => {
       eventLogger.log({
         level: "info",
         label: "receive",
@@ -39,31 +36,34 @@ export class MQTTListener {
       });
     });
 
-    accountInstance.realtime.on(
+    this.igInstance.realtime.on(
       "message",
       this.logEvent(
         "messageWrapper",
-        (mLoggedInUser as AccountRepositoryLoginResponseLogged_in_user).pk
+        (this.loggedInUser as AccountRepositoryLoginResponseLogged_in_user).pk
       )
     );
 
-    accountInstance.realtime.on(
+    this.igInstance.realtime.on(
       "threadUpdate",
       this.logEvent("threadUpdateWrapper")
     );
 
-    accountInstance.realtime.on("direct", this.logEvent("direct"));
+    this.igInstance.realtime.on("direct", this.logEvent("direct"));
 
-    accountInstance.realtime.on("realtimeSub", this.logEvent("realtimeSub"));
+    this.igInstance.realtime.on("realtimeSub", this.logEvent("realtimeSub"));
 
-    accountInstance.realtime.on("error", async (err) => {
-      console.log(err);
+    this.igInstance.realtime.on("error", async (err) => {
       if (err.message.toLowerCase().includes("mqttotclient got disconnected")) {
-        console.log("mqttotclient got disconnected in event");
-        if (this.counter < 5) {
-          this.restartMQTTListeners();
+        console.log("MQTT Client disconnected at ", new Date().toISOString());
+        if (this.counter <= 10) {
           this.counter += 1;
+          this.reconnectMQTT();
         } else {
+          await this.mailer.send({
+            subject: `${Bun.env.CLIENT_ORG} server: MQTT client restart failure`,
+            text: `Hi team,\nThe MQTT Client attempted to restart itself 10 times. Please check if this can be handled manually.`,
+          });
           console.log("Attempted 5 times to reconnect ");
         }
       }
@@ -72,7 +72,6 @@ export class MQTTListener {
         label: "MQTT error",
         message: JSON.stringify(err),
       });
-      /*
       await this.mailer.send({
         subject: `${Bun.env.CLIENT_ORG} server: MQTT client error`,
         text: `Hi team, There was an error in mqtt.\nThe error message is \n${
@@ -81,12 +80,9 @@ export class MQTTListener {
           (err as Error).stack
         }\nPlease check on this.`,
       });
-      */
     });
 
-    accountInstance.realtime.on("disconnect", async () => {
-      console.log("In disconnect method");
-
+    this.igInstance.realtime.on("disconnect", async () => {
       libLogger.log({
         level: "error",
         label: "MQTT Disconnect",
@@ -94,11 +90,11 @@ export class MQTTListener {
       });
       await this.mailer.send({
         subject: "MQTT client disconnected",
-        text: "Hi team, MQTT was really disconnected got disconnected. Please check on this.",
+        text: "Hi team, MQTT was safely disconnected. Please check on this.",
       });
     });
 
-    accountInstance.realtime.on("close", async () => {
+    this.igInstance.realtime.on("close", async () => {
       libLogger.log({
         level: "error",
         label: "MQTT Closed",
@@ -109,28 +105,30 @@ export class MQTTListener {
         text: "Hi team, The Realtime client closed. Please check on this.",
       });
     });
+  }
 
-    await accountInstance.realtime.connect({
+  public async connectMQTTBroker() {
+    await this.igInstance.realtime.connect({
       graphQlSubs: [
         // these are some subscriptions
         GraphQLSubscriptions.getAppPresenceSubscription(),
         GraphQLSubscriptions.getZeroProvisionSubscription(
-          accountInstance.state.phoneId
+          this.igInstance.state.phoneId
         ),
         GraphQLSubscriptions.getDirectStatusSubscription(),
         GraphQLSubscriptions.getDirectTypingSubscription(
-          accountInstance.state.cookieUserId
+          this.igInstance.state.cookieUserId
         ),
         GraphQLSubscriptions.getAsyncAdSubscription(
-          accountInstance.state.cookieUserId
+          this.igInstance.state.cookieUserId
         ),
       ],
       // optional
       skywalkerSubs: [
-        SkywalkerSubscriptions.directSub(accountInstance.state.cookieUserId),
-        SkywalkerSubscriptions.liveSub(accountInstance.state.cookieUserId),
+        SkywalkerSubscriptions.directSub(this.igInstance.state.cookieUserId),
+        SkywalkerSubscriptions.liveSub(this.igInstance.state.cookieUserId),
       ],
-      irisData: await accountInstance.feed.directInbox().request(),
+      irisData: await this.igInstance.feed.directInbox().request(),
       connectOverrides: {},
     });
 
@@ -139,7 +137,7 @@ export class MQTTListener {
       eventLogger.info("Device off");
       // from now on, you won't receive any realtime-data as you "aren't in the app"
       // the keepAliveTimeout is somehow a 'constant' by instagram
-      accountInstance.realtime.direct.sendForegroundState({
+      this.igInstance.realtime.direct.sendForegroundState({
         inForegroundApp: false,
         inForegroundDevice: false,
         keepAliveTimeout: 900,
@@ -149,7 +147,8 @@ export class MQTTListener {
     setTimeout(() => {
       eventLogger.info("In App");
       console.log("Started listening");
-      accountInstance.realtime.direct.sendForegroundState({
+      // this.counter = 0;
+      this.igInstance.realtime.direct.sendForegroundState({
         inForegroundApp: true,
         inForegroundDevice: true,
         keepAliveTimeout: 60,
@@ -185,40 +184,63 @@ export class MQTTListener {
     };
   }
 
-  private restartMQTTListeners() {
-    this.igInstance.realtime.removeAllListeners();
+  private async reconnectMQTT() {
+    console.log(this.counter);
     setTimeout(async () => {
       try {
-        await this.initializeRealtimeEvents(this.igInstance, this.loggedInUser);
+        await this.connectMQTTBroker();
         console.log("Started safely");
         libLogger.log({
           level: "info",
           label: "MQTT restart successful",
           message: "MQTT Restarted itself successfully",
         });
-        /*
         await this.mailer.send({
           subject: `${Bun.env.CLIENT_ORG} server: MQTT Server restart`,
           text: `Hi team, The MQTT Server disconnected but it restarted itself`,
         });
-        */
       } catch (err) {
+        this.counter += 1;
         console.log("Error while restarting\n", err);
         libLogger.log({
           level: "error",
           label: "MQTT restart error",
           message: JSON.stringify(err),
         });
-        /*
+        if (this.counter <= 10) {
+          this.igInstance.realtime.removeAllListeners();
+          console.log("Triggering clean disconnect", err);
+          this.igInstance.realtime.once("disconnect", () => {
+            console.log("MQTT cleanly disconnected");
+            libLogger.log({
+              level: "error",
+              label: "MQTT Disconnect",
+              message: "Client got disconnected cleanly",
+            });
+            this.registerRealtimeListeners();
+            this.reconnectMQTT();
+          });
+          this.igInstance.realtime.emit("disconnect");
+        } else {
+          console.log("Attempted a restart 10 times");
+          libLogger.log({
+            level: "error",
+            label: "MQTT Reconnect error",
+            message: "Client cannot restart more than 10 times",
+          });
+          await this.mailer.send({
+            subject: `${Bun.env.CLIENT_ORG} server: Error restarting listeners`,
+            text: `The server attempted a clean restart more 10 times and will not try any new attempts`,
+          });
+        }
         await this.mailer.send({
           subject: `${Bun.env.CLIENT_ORG} server: Error restarting listeners`,
           text: `Hi team, There was an error in mqtt.\nThe error message is \n${
             (err as Error).message
           }\nand the stack trace is as follows:\n${
             (err as Error).stack
-          }\nPlease check on this.`,
+          }\n. This event triggered a clean disconnect, and will attempt to reconnect. Please check on this.`,
         });
-        */
       }
     }, 30000);
   }

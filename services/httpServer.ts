@@ -146,7 +146,7 @@ export class HttpServer {
     }
     if (request.method === "POST" && url.pathname === "/trigger-disconnect") {
       try {
-        await this.igInstance.realtime.disconnect();
+        await this.igInstance.realtime.disconnectDirty();
         return new Response(
           JSON.stringify({
             status: "OK",
