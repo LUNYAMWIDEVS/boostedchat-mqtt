@@ -12,6 +12,13 @@ declare module "bun" {
     SMTP_HOST: string;
     SMTP_PORT: number;
     AMQP_HOST: string;
+    POSTGRES_HOST: string;
+    POSTGRES_PORT: number;
+    POSTGRES_USERNAME: string;
+    POSTGRES_PASSWORD: string;
+    POSTGRES_DBNAME: string;
+    REDIS_HOST: string;
+    REDIS_PORT: number;
   }
 }
 
@@ -27,6 +34,13 @@ export const validateEnv = () => {
     SMTP_HOST: str(),
     SMTP_PORT: num(),
     EMAIL_RECIPIENTS: json<string[]>(),
+    POSTGRES_HOST: str(),
+    POSTGRES_PORT: str(),
+    POSTGRES_USERNAME: str(),
+    POSTGRES_PASSWORD: str(),
+    POSTGRES_DBNAME: str(),
+    REDIS_HOST: str(),
+    REDIS_PORT: str(),
   };
   cleanEnv(process.env, envs);
 };

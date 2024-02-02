@@ -1,9 +1,11 @@
 import { requestAccounts } from "./services/accountsRequest";
 import { receiveAccounts } from "./services/receiveAccounts";
 import { validateEnv } from "./utils/environment";
+import "./config/cache";
 
 (async () => {
-  validateEnv();
-  await requestAccounts();
-  await receiveAccounts();
+  console.log("done");
+  //validateEnv();
+  //await requestAccounts();
+  //await receiveAccounts();
 })();

@@ -411,6 +411,7 @@ export class MQTTListener {
             const thread = this.accountInstances
               .get(this.username)!
               .instance.entity.directThread([userId.toString()]);
+            this.accountInstances.get(this.username);
             await thread.broadcastText(body.generated_comment);
           }, 75000);
         }
