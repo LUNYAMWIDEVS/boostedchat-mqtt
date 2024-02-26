@@ -77,7 +77,18 @@ export class HttpServer {
           .instance.entity.directThread([userId.toString()]);
 
         if (data.mediaId) {
-          await thread.broadcastPost(data.mediaId);
+          try{
+            await thread.broadcastPost(data.mediaId);
+          }catch(err){
+            this.mailer.send({
+              subject: `Sending media error`,
+              text: `Hi team, There was an error sending a media to a lead but nevertheless we are still proceeding without the media and reaching out.\nThe error message is \n${
+                (err as Error).message
+              }\nand the stack trace is as follows:\n${
+                (err as Error).stack
+              }\nPlease check on this.`,
+            });
+          }
         } else {
           await this.mailer.send({
             subject: `Unable to send media`,
