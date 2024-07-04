@@ -25,6 +25,7 @@ import {
 } from "../services/accounts";
 
 import {logout, disconnect} from "../services/login"
+import { cli } from "winston/lib/winston/config";
 
 export class HttpServer {
   private mailer: Mailer;
@@ -540,7 +541,25 @@ export class HttpServer {
           return new Response("There was an error", { status: 400 });
       }
     } 
+    if (request.method === "POST" && url.pathname === "/fetchPendingInbox"){
+      const data = await request.json();
+      const clientInstance = this.accountInstances.get(data.username_from)!.instance;
+      const inbox = await clientInstance.feed.directPending()
+      return new Response(JSON.stringify(await inbox.items()), {
+        headers: { 'Content-Type': 'application/json' },
+      });
 
+    }
+
+    if (request.method === "POST" && url.pathname === "/approve"){
+      const data = await request.json();
+      const clientInstance = this.accountInstances.get(data.username_from)!.instance;
+      console.log(data)
+      await clientInstance.directThread.approve(data.thread_id);
+      return new Response(JSON.stringify("OK"));
+    }
+
+    
 
     if (request.method === "POST" && url.pathname === "/viewStory") {
       try {

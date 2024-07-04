@@ -33,6 +33,7 @@ export class MQTTListener {
         });
       });
 
+    // Listen for messages
     this.accountInstances
       .get(this.username)
       ?.instance.realtime.on(
@@ -42,6 +43,9 @@ export class MQTTListener {
           this.accountInstances.get(this.username)!.userId
         )
       );
+          
+    
+
 
     this.accountInstances
       .get(this.username)
@@ -52,11 +56,15 @@ export class MQTTListener {
 
     this.accountInstances
       .get(this.username)
-      ?.instance.realtime.on("direct", this.logEvent("direct"));
-
+      ?.instance.realtime.on("direct", (data) => {
+        console.log('Received direct message:', data);
+      });
+      
     this.accountInstances
       .get(this.username)
-      ?.instance.realtime.on("realtimeSub", this.logEvent("realtimeSub"));
+      ?.instance.realtime.on("realtimeSub", (data) => {
+        console.log('Received realtime subscription:', data);
+      });
 
     this.accountInstances
       .get(this.username)
@@ -143,6 +151,9 @@ export class MQTTListener {
         GraphQLSubscriptions.getAsyncAdSubscription(
           this.accountInstances.get(this.username)!.instance.state.cookieUserId
         ),
+        // GraphQLSubscriptions.getLiveRealtimeCommentsSubscription(
+        //   this.accountInstances.get(this.username)!.instance.state.deviceId
+        // )
       ],
       // optional
       skywalkerSubs: [
@@ -187,10 +198,19 @@ export class MQTTListener {
           keepAliveTimeout: 60,
         });
     }, 4000);
+    // an example on how to subscribe to live comments
+   // you can add other GraphQL subs using .subscribe
+  //  await this.accountInstances.get(this.username)!.instance.realtime.graphQlSubscribe(GraphQLSubscriptions.getLiveRealtimeCommentsSubscription('<broadcast-id>'));
   }
 
   private logEvent(name: string, userId?: number) {
     return (data: any) => {
+      if (name === "realtimeSub" && userId) {
+        console.log(data)
+      }  
+      if (name === "direct" && userId) {
+        console.log(data)
+      }
       if (name === "messageWrapper" && userId) {
         (async () => {
           if (data?.message?.thread_id == null || data?.message?.text == null) {

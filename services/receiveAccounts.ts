@@ -18,6 +18,10 @@ export const receiveAccounts = async () => {
     }
   });
 
+  // subscriber.on("direct",(message)) => {
+  //   console.log(message)
+  // }
+
   // Listen for messages on the subscribed channel
   subscriber.on("message", (channel, message) => {
     const watchMessage = message
@@ -50,6 +54,7 @@ export const receiveAccounts = async () => {
     }
     // console.log(`Received message from channel ${channel}: ${watchMessage}`);
     console.log(`Received message from channel ${channel}`);
+    console.log(message);
   });
 
   subscriber.on("error", (err) => {
